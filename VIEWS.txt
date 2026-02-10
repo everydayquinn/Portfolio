@@ -1,0 +1,149 @@
+Metrics_Multipliers
+
+
+
+CREATE VIEW [dbo].[Metrics_Multipliers] AS
+SELECT
+    m.MetricsID, m.PageID, pn.PageName, c.Date, c.Year, c.Month,
+    m.Impressions, m.Views, m.Interactions, m.Reactions,
+    ROUND(m.Views * 1.0 / NULLIF(m.Impressions, 0), 3) AS ViewMultiplier,
+    ROUND(m.Interactions * 1.0 / NULLIF(m.Impressions, 0), 3) AS IntRate,
+    ROUND(m.Reactions * 1.0 / NULLIF(m.Interactions, 0), 3) AS ReactRate,
+    
+    CASE c.Month 
+        WHEN 1 THEN 'January' WHEN 2 THEN 'February'
+        WHEN 3 THEN 'March' WHEN 4 THEN 'April' WHEN 5 THEN 'May'
+        WHEN 6 THEN 'June' WHEN 7 THEN 'July' WHEN 8 THEN 'August'
+        WHEN 9 THEN 'September' WHEN 10 THEN 'October'
+        WHEN 11 THEN 'November' WHEN 12 THEN 'December'
+    END AS MonthName,
+    CASE WHEN c.IsSchoolHoliday = 1 AND c.SpecialDateID > 0 THEN 'Both'
+         WHEN c.IsSchoolHoliday = 1 THEN 'School Only'
+         WHEN c.SpecialDateID > 0 THEN 'Public Only' 
+         ELSE 'Regular Day' END AS Holiday_Type,
+		     CASE 
+        WHEN c.Month IN (1, 2, 3) THEN 'Q1'
+        WHEN c.Month IN (4, 5, 6) THEN 'Q2'
+        WHEN c.Month IN (7, 8, 9) THEN 'Q3'
+        WHEN c.Month IN (10, 11, 12) THEN 'Q4'
+    END AS Quarter
+FROM dbo.Metrics m
+JOIN dbo.PageNames pn ON m.PageID = pn.PageID
+JOIN dbo.Calendar c ON m.CalendarID = c.CalendarID;
+GO
+
+
+
+
+
+PowerBI_SpecialDates
+
+
+
+CREATE   VIEW [dbo].[PowerBI_SpecialDates] AS
+SELECT
+    c.CalendarID,
+    c.[Date],
+    c.DayOfWeek,
+    c.IsWeekend,
+    c.IsSchoolHoliday,
+    c.SpecialDateID,
+    sd.SpecialDateName,
+    sd.Date AS SpecialDateDate,
+    sd.SchoolHolidayPotential
+FROM dbo.Calendar c
+LEFT JOIN dbo.SpecialDates sd
+    ON c.[Date] = sd.[Date];
+GO
+
+
+
+
+
+
+
+PowerBI_Metrics
+
+
+CREATE   VIEW [dbo].[PowerBI_Metrics] AS
+SELECT
+    m.MetricsID,
+    m.PageID,
+    pn.PageName,
+    
+    c.CalendarID,
+    c.[Date],
+    c.[Year],
+    MONTH(c.[Date]) AS MonthNumber,
+    CASE MONTH(c.[Date])
+        WHEN 1 THEN 'January' WHEN 2 THEN 'February'
+        WHEN 3 THEN 'March' WHEN 4 THEN 'April'
+        WHEN 5 THEN 'May' WHEN 6 THEN 'June'
+        WHEN 7 THEN 'July' WHEN 8 THEN 'August'
+        WHEN 9 THEN 'September' WHEN 10 THEN 'October'
+        WHEN 11 THEN 'November' WHEN 12 THEN 'December'
+    END AS MonthName,
+    c.Day,
+    CASE c.DayOfWeek
+        WHEN 1 THEN 'Monday' WHEN 2 THEN 'Tuesday'
+        WHEN 3 THEN 'Wednesday' WHEN 4 THEN 'Thursday'
+        WHEN 5 THEN 'Friday' WHEN 6 THEN 'Saturday' WHEN 7 THEN 'Sunday'
+    END AS DayName,
+    c.DayOfWeek,
+    c.IsWeekend,
+    c.FiscalQuarter,
+    c.SpecialDateID,
+    sd.SpecialDateName,
+    sd.Date AS SpecialDateDate,
+    sd.SchoolHolidayPotential,
+
+    -- Holiday_Type
+    CASE 
+        WHEN c.IsSchoolHoliday = 1 AND sd.SpecialDateID IS NOT NULL THEN 'Both'
+        WHEN c.IsSchoolHoliday = 1 THEN 'School Only'
+        WHEN sd.SpecialDateID IS NOT NULL THEN 'Public Only'
+        ELSE 'Regular Day'
+    END AS Holiday_Type,
+
+    -- Metrics
+    m.Impressions,
+    m.Views,
+    m.Interactions,
+    m.Reactions,
+    m.NetFollows,
+    m.CommentsAndReplies,
+    m.Shares,
+    m.ApproximateEarningsUSD,
+    m.StarsUSD,
+
+    -- Calculated metrics
+    ROUND(m.Views * 1.0 / NULLIF(m.Impressions, 0), 3) AS ViewMultiplier,
+    ROUND(m.Interactions * 1.0 / NULLIF(m.Impressions, 0), 3) AS IntRate,
+    ROUND(m.Reactions * 1.0 / NULLIF(m.Interactions, 0), 3) AS ReactRate
+
+FROM dbo.Metrics m
+JOIN dbo.PageNames pn ON m.PageID = pn.PageID
+JOIN dbo.Calendar c ON m.CalendarID = c.CalendarID
+LEFT JOIN dbo.SpecialDates sd ON c.[Date] = sd.[Date];
+GO
+
+
+
+
+
+Top Performance Days
+
+
+CREATE VIEW [dbo].[Top_Performance_Days] AS
+SELECT TOP 10
+    pn.PageName, c.Date, c.DayOfWeek, c.IsWeekend, c.IsSchoolHoliday,  -- Add here
+    m.Impressions, m.Views, m.Interactions, m.Reactions,
+    ROUND(m.Views * 1.0 / NULLIF(m.Impressions, 0), 3) AS ViewMultiplier,
+    m.NetFollows
+FROM dbo.Metrics m
+JOIN dbo.PageNames pn ON m.PageID = pn.PageID
+JOIN dbo.Calendar c ON m.CalendarID = c.CalendarID
+ORDER BY m.Interactions DESC, m.Views DESC;
+GO
+
+
